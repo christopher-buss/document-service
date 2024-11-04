@@ -10,3 +10,5 @@ Packages
 DevPackages
 build
 .vscode
+
+node_modules
