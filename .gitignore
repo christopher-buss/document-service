@@ -11,4 +11,8 @@ DevPackages
 build
 .vscode
 
-node_modules
+/node_modules
+/out
+/include
+*.tsbuildinfo
+flamework.build

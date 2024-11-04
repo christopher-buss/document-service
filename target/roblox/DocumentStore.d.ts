@@ -66,7 +66,7 @@ interface DocumentStore<T> {
  * @returns DocumentStore<T>.
  */
 type DocumentStoreConstructor<T> = new (props: {
-	check: (data: unknown) => LuaTuple<[boolean, T]>;
+	check: (data: unknown) => LuaTuple<[boolean, T?]> | boolean;
 	dataStore: DataStoreInterface;
 	default: T;
 	key: string;

@@ -30,9 +30,6 @@
 		"roblox-ts": "3.0.0",
 		"typescript": "=5.5.3"
 	},
-	"peerDependencies": {
-		"@rbxts/t": "*"
-	},
 	"packageManager": "pnpm@9.12.3",
 	"publishConfig": {
 		"access": "public"
