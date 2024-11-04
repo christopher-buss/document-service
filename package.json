@@ -15,7 +15,7 @@
 	"scripts": {
 		"build": "rbxtsc",
 		"dev": "rbxtsc -w",
-		"prepublishOnly": "build",
+		"prepublishOnly": "run build",
 		"release": "bumpp && pnpm publish --p"
 	},
 	"devDependencies": {
