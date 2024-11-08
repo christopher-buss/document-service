@@ -1,5 +1,5 @@
-import type Document from "Document";
-import type { DataStoreInterface, Migrations } from "Types";
+import type { Document } from "./Document";
+import type { DataStoreInterface, Migrations } from "./Types";
 
 /**
  * Represents a collection of Documents, analogous to a DataStore.
@@ -12,7 +12,29 @@ import type { DataStoreInterface, Migrations } from "Types";
  *
  * @template T - The type of the data.
  */
-interface DocumentStore<T> {
+export class DocumentStore<T> {
+	/**
+	 * Creates a new DocumentStore.
+	 *
+	 * Warning: This should only be called once per server for each DataStore in
+	 * a live game. If there are multiple instances of a DocumentStore for one
+	 * key, any Documents will be treated as if they are from different
+	 * sessions. This is useful for unit testing but can lead to weird bugs in
+	 * production. DocumentStores should persist through an entire server's
+	 * lifespan and are not garbage collected.
+	 *
+	 * @template T - The type of the data.
+	 * @param props - DocumentStoreProps to create the DocumentStore.
+	 * @returns DocumentStore<T>.
+	 */
+	constructor(props: {
+		check: (data: unknown) => boolean | LuaTuple<[boolean, T?]>;
+		dataStore: DataStoreInterface;
+		default: T;
+		lockSessions: boolean;
+		migrations: Migrations;
+	});
+
 	/**
 	 * Closes all open documents as fast as possible. This runs on BindToClose
 	 * already.
@@ -29,7 +51,7 @@ interface DocumentStore<T> {
 	 *
 	 * @yields
 	 */
-	CloseAllDocuments(): void;
+	public CloseAllDocuments(): void;
 
 	/**
 	 * Gets the document for the key given, or creates one if it does not exist.
@@ -45,34 +67,8 @@ interface DocumentStore<T> {
 	 * @returns Document<T>.
 	 * @returns Boolean -- whether a new document was created.
 	 */
-	GetDocument(key: string): LuaTuple<[document: Document<T>, created: boolean]>;
+	public GetDocument(key: string): LuaTuple<[document: Document<T>, created: boolean]>;
 
 	/** @returns If a given metatable passed is a DocumentStore. */
-	isDocumentStore: (instance: unknown) => boolean;
+	public isDocumentStore: (instance: unknown) => boolean;
 }
-
-/**
- * Creates a new DocumentStore.
- *
- * Warning: This should only be called once per server for each DataStore in a
- * live game. If there are multiple instances of a DocumentStore for one key,
- * any Documents will be treated as if they are from different sessions. This is
- * useful for unit testing but can lead to weird bugs in production.
- * DocumentStores should persist through an entire server's lifespan and are not
- * garbage collected.
- *
- * @template T - The type of the data.
- * @param props - DocumentStoreProps to create the DocumentStore.
- * @returns DocumentStore<T>.
- */
-type DocumentStoreConstructor<T> = new (props: {
-	check: (data: unknown) => LuaTuple<[boolean, T?]> | boolean;
-	dataStore: DataStoreInterface;
-	default: T;
-	key: string;
-	lockSessions: boolean;
-	migrations: Migrations;
-}) => DocumentStore<T>;
-
-declare const DocumentStore: DocumentStoreConstructor<unknown>;
-export = DocumentStore;

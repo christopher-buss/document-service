@@ -9,14 +9,14 @@ import type {
 	SchemaError,
 	SessionLockedError,
 	Transform,
-} from "Types";
+} from "./Types";
 
-type OpenResult<T> = Result<
+export type OpenResult<T> = Result<
 	T,
 	BackwardsCompatibilityError | CheckError | RobloxAPIError | SessionLockedError
 >;
 
-type WriteResult<T> = Result<T, RobloxAPIError | SchemaError | SessionLockedError>;
+export type WriteResult<T> = Result<T, RobloxAPIError | SchemaError | SessionLockedError>;
 
 /**
  * An abstraction over keys in a DataStore.
@@ -45,7 +45,16 @@ type WriteResult<T> = Result<T, RobloxAPIError | SchemaError | SessionLockedErro
  *
  * @template T The type of the data.
  */
-interface Document<T> {
+export class Document<T> {
+	constructor(props: {
+		check: (data: unknown) => LuaTuple<[boolean, T]>;
+		dataStore: DataStoreInterface;
+		default: T;
+		key: string;
+		lockSessions: boolean;
+		migrations: Migrations;
+	});
+
 	/**
 	 * Closes the document, so it cannot be edited.
 	 *
@@ -57,7 +66,7 @@ interface Document<T> {
 	 * @yields
 	 * @returns WriteResult<T | undefined>.
 	 */
-	Close(): WriteResult<T | undefined>;
+	public Close(): WriteResult<T | undefined>;
 
 	/**
 	 * Erases all data associated with the key.
@@ -72,7 +81,7 @@ interface Document<T> {
 	 * @yields
 	 * @returns Result<undefined, RobloxAPIError>.
 	 */
-	Erase(): Result<undefined, RobloxAPIError>;
+	public Erase(): Result<undefined, RobloxAPIError>;
 
 	/**
 	 * Retrieves the cache.
@@ -85,7 +94,7 @@ interface Document<T> {
 	 *
 	 * @returns - Data from the cache.
 	 */
-	GetCache(): T;
+	public GetCache(): T;
 
 	/**
 	 * Attaches a hook which occurs after the event, before the method returns.
@@ -102,7 +111,7 @@ interface Document<T> {
 	 * @returns Cleanup - A callback that removes the hook from the given hook
 	 *   event registry.
 	 */
-	HookAfter(event: HookEvent, hook: () => void): () => void;
+	public HookAfter(event: HookEvent, hook: () => void): () => void;
 
 	/**
 	 * Attaches a hook which occurs before the event.
@@ -118,7 +127,7 @@ interface Document<T> {
 	 * @returns Cleanup - a callback that removes the hook from the given hook
 	 *   event registry.
 	 */
-	HookBefore(event: HookEvent, hook: () => void): () => void;
+	public HookBefore(event: HookEvent, hook: () => void): () => void;
 
 	/**
 	 * Attaches a hook which occurs after an event fails.
@@ -132,10 +141,10 @@ interface Document<T> {
 	 * @returns Cleanup - A callback that removes the hook from the given hook
 	 *   event registry.
 	 */
-	HookFail(event: HookEvent, hook: () => void): () => void;
+	public HookFail(event: HookEvent, hook: () => void): () => void;
 
 	/** @returns True if '.Close' has been called and is incomplete. */
-	IsClosing(): boolean;
+	public IsClosing(): boolean;
 
 	/**
 	 * Checks if a metatable passed is a Document.
@@ -143,10 +152,10 @@ interface Document<T> {
 	 * @param instance - The metatable to check.
 	 * @returns Boolean - True if the metatable is a Document, false otherwise.
 	 */
-	isDocument: (instance: unknown) => boolean;
+	public isDocument: (instance: unknown) => boolean;
 
 	/** @returns Whether the Document is open or not. */
-	IsOpen(): boolean;
+	public IsOpen(): boolean;
 
 	/**
 	 * Returns a false Result if Document is currently open, locked by another
@@ -160,7 +169,7 @@ interface Document<T> {
 	 * @yields
 	 * @returns Result<boolean, RobloxAPIError>.
 	 */
-	IsOpenAvailable(): Result<boolean, RobloxAPIError>;
+	public IsOpenAvailable(): Result<boolean, RobloxAPIError>;
 
 	/**
 	 * Attaches a single-use hook which occurs after the event, before the
@@ -170,7 +179,7 @@ interface Document<T> {
 	 * @param hook - A hook function that receives the arguments passed in to
 	 *   the operation.
 	 */
-	OnceAfter(event: HookEvent, hook: () => void): void;
+	public OnceAfter(event: HookEvent, hook: () => void): void;
 
 	/**
 	 * Attaches a single-use hook which occurs before the event.
@@ -179,7 +188,7 @@ interface Document<T> {
 	 * @param hook - A hook function that receives the arguments passed in to
 	 *   the operation.
 	 */
-	OnceBefore(event: HookEvent, hook: () => void): void;
+	public OnceBefore(event: HookEvent, hook: () => void): void;
 
 	/**
 	 * Attaches a single-use hook which occurs after an event fails.
@@ -188,7 +197,7 @@ interface Document<T> {
 	 * @param hook - A hook function that receives the arguments passed in to
 	 *   the operation.
 	 */
-	OnceFail(event: HookEvent, hook: () => void): void;
+	public OnceFail(event: HookEvent, hook: () => void): void;
 
 	/**
 	 * Validates the document if one exists, creates a default document if no
@@ -212,7 +221,7 @@ interface Document<T> {
 	 * @yields
 	 * @returns OpenResult<T>.
 	 */
-	Open(): OpenResult<T>;
+	public Open(): OpenResult<T>;
 
 	/**
 	 * Opens, and also runs a transform function on the data. Useful for
@@ -228,7 +237,7 @@ interface Document<T> {
 	 * @yields
 	 * @returns OpenResult<T>.
 	 */
-	OpenAndUpdate(transform: Transform<T>): OpenResult<T>;
+	public OpenAndUpdate(transform: Transform<T>): OpenResult<T>;
 
 	/**
 	 * Reads the latest data stored in Data Stores.
@@ -248,7 +257,10 @@ interface Document<T> {
 	 * @returns Result<any, RobloxAPIError | SchemaError | CheckError |
 	 *   BackwardsCompatibilityError>.
 	 */
-	Read(): Result<T, BackwardsCompatibilityError | CheckError | RobloxAPIError | SchemaError>;
+	public Read(): Result<
+		T,
+		BackwardsCompatibilityError | CheckError | RobloxAPIError | SchemaError
+	>;
 
 	/**
 	 * Saves a Document's cache to its DataStore. Equivalent to calling Update
@@ -259,7 +271,7 @@ interface Document<T> {
 	 * @yields
 	 * @returns WriteResult<T>.
 	 */
-	Save(): WriteResult<T>;
+	public Save(): WriteResult<T>;
 
 	/**
 	 * Sets the cache.
@@ -276,7 +288,7 @@ interface Document<T> {
 	 * @param cacheToSet - The cache to set that must pass the check function.
 	 * @returns T - A deep frozen copy of the cache.
 	 */
-	SetCache(cacheToSet: T): T;
+	public SetCache(cacheToSet: T): T;
 
 	/**
 	 * Marks the lock as stolen. The next `:Open` call will ignore any existing
@@ -288,7 +300,7 @@ interface Document<T> {
 	 * Do not use this unless you are very sure the previous session is dead, or
 	 * you could cause data loss. Only usable on session-locked Documents.
 	 */
-	Steal(): void;
+	public Steal(): void;
 
 	/**
 	 * Performs an atomic transaction on the Document, writing to the DataStore.
@@ -298,9 +310,6 @@ interface Document<T> {
 	 * If using session locking, transforms will build on cached data.
 	 *
 	 * Throws if data is not storable or the transform return value is invalid.
-	 *
-	 * Tip: Due to Luau limitations with the old solver, you will get the best
-	 * experience if you manually annotate the type of the transform parameter.
 	 *
 	 * Warning: The transform function must not yield, and shouldn't rely on any
 	 * data from outside. It must follow the rules of what is storable in Data
@@ -323,17 +332,5 @@ interface Document<T> {
 	 * @yields
 	 * @returns WriteResult<T>.
 	 */
-	Update(transform: Transform<T>): WriteResult<T>;
+	public Update(transform: Transform<T>): WriteResult<T>;
 }
-
-type DocumentConstructor<T> = new (props: {
-	check: (data: unknown) => LuaTuple<[boolean, T]>;
-	dataStore: DataStoreInterface;
-	default: T;
-	key: string;
-	lockSessions: boolean;
-	migrations: Migrations;
-}) => Document<T>;
-
-declare const Document: DocumentConstructor<unknown>;
-export = Document;

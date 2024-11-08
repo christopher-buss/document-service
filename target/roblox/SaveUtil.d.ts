@@ -1,4 +1,4 @@
-import type { DataStoreInterface } from "Types";
+import type { DataStoreInterface } from "./Types";
 
 interface SaveUtil {
 	/**
