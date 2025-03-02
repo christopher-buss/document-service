@@ -9,24 +9,23 @@
 	"main": "out/init.lua",
 	"types": "out/index.d.ts",
 	"files": [
-		"out",
-		"!**/*.tsbuildinfo"
+		"out"
 	],
 	"scripts": {
 		"build": "rbxtsc",
 		"dev": "rbxtsc -w",
-		"prepublishOnly": "pnpm run build",
 		"prepare": "rbxtsc",
+		"prepublishOnly": "pnpm run build",
 		"release": "bumpp && pnpm publish --p"
 	},
 	"devDependencies": {
 		"@eslint-react/eslint-plugin": "1.14.2",
-		"@isentinel/eslint-config": "^0.8.0",
+		"@isentinel/eslint-config": "1.0.0-beta.1",
 		"@rbxts/compiler-types": "3.0.0-types.0",
 		"@rbxts/t": "3.1.0",
 		"@rbxts/types": "1.0.808",
 		"bumpp": "^9.7.0",
-		"eslint": "9.11.0",
+		"eslint": "9.21.0",
 		"jiti": "^2.4.0",
 		"roblox-ts": "3.0.0",
 		"typescript": "=5.5.3"

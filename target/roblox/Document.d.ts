@@ -1,3 +1,4 @@
+import type { Signal } from "./Signal";
 import type {
 	BackwardsCompatibilityError,
 	CheckError,
@@ -16,7 +17,22 @@ export type OpenResult<T> = Result<
 	BackwardsCompatibilityError | CheckError | RobloxAPIError | SessionLockedError
 >;
 
+export type ReadResult<T> = Result<
+	T,
+	BackwardsCompatibilityError | CheckError | RobloxAPIError | SchemaError
+>;
+
 export type WriteResult<T> = Result<T, RobloxAPIError | SchemaError | SessionLockedError>;
+
+export interface KeyData<T> {
+	data: T;
+	dataSchemaVersion: number;
+	documentServiceSchemaVersion: number;
+	isLocked: boolean;
+	lastCompatibleVersion: number;
+	lockTimestamp: number;
+	sessionLockId: string;
+}
 
 /**
  * An abstraction over keys in a DataStore.
@@ -46,6 +62,14 @@ export type WriteResult<T> = Result<T, RobloxAPIError | SchemaError | SessionLoc
  * @template T The type of the data.
  */
 export class Document<T> {
+	/**
+	 * Checks if a metatable passed is a Document.
+	 *
+	 * @param instance - The metatable to check.
+	 * @returns Boolean - True if the metatable is a Document, false otherwise.
+	 */
+	public isDocument: (instance: unknown) => boolean;
+
 	constructor(props: {
 		check: (data: unknown) => LuaTuple<[boolean, T]>;
 		dataStore: DataStoreInterface;
@@ -62,6 +86,8 @@ export class Document<T> {
 	 *
 	 * If session locked, will save the document, remove the lock, and cancel
 	 * autosaves first. If this fails, the document will not be closed.
+	 *
+	 * If the Close performs a Save, Result.data will be the data saved.
 	 *
 	 * @yields
 	 * @returns WriteResult<T | undefined>.
@@ -105,6 +131,7 @@ export class Document<T> {
 	 * Hooks added with HookAfter only run if the operation is successful, and
 	 * cannot mutate the result.
 	 *
+	 * @deprecated - Use signal instead.
 	 * @param event - The operation to call the hook after.
 	 * @param hook - A hook function that receives the arguments passed in to
 	 *   the operation.
@@ -135,6 +162,7 @@ export class Document<T> {
 	 * Note that fail hooks only run when a method returns an Err<E> type. They
 	 * will not run if the method throws a Luau error due to incorrect usage.
 	 *
+	 * @deprecated - Use signal instead.
 	 * @param event - The operation to call the hook after.
 	 * @param hook - A hook function that receives the arguments passed in to
 	 *   the operation.
@@ -145,14 +173,6 @@ export class Document<T> {
 
 	/** @returns True if '.Close' has been called and is incomplete. */
 	public IsClosing(): boolean;
-
-	/**
-	 * Checks if a metatable passed is a Document.
-	 *
-	 * @param instance - The metatable to check.
-	 * @returns Boolean - True if the metatable is a Document, false otherwise.
-	 */
-	public isDocument: (instance: unknown) => boolean;
 
 	/** @returns Whether the Document is open or not. */
 	public IsOpen(): boolean;
@@ -175,6 +195,7 @@ export class Document<T> {
 	 * Attaches a single-use hook which occurs after the event, before the
 	 * method returns.
 	 *
+	 * @deprecated - Use signal instead.
 	 * @param event - The operation to call the hook after.
 	 * @param hook - A hook function that receives the arguments passed in to
 	 *   the operation.
@@ -193,6 +214,7 @@ export class Document<T> {
 	/**
 	 * Attaches a single-use hook which occurs after an event fails.
 	 *
+	 * @deprecated - Use signal instead.
 	 * @param event - The operation to call the hook after.
 	 * @param hook - A hook function that receives the arguments passed in to
 	 *   the operation.
@@ -203,6 +225,11 @@ export class Document<T> {
 	 * Validates the document if one exists, creates a default document if no
 	 * document exists, or creates a document with the data that is in the given
 	 * key if the key hasn't been used with DocumentService before.
+	 *
+	 * A document needs to be opened before use (even if it is not
+	 * session-locked), as this ensures all migrations run and the cases of
+	 * missing or legacy data are handled. If you only need to update a document
+	 * once, consider `OpenAndUpdate`.
 	 *
 	 * Opening a session-locked document will enable periodic autosaves until it
 	 * is closed.
@@ -231,13 +258,59 @@ export class Document<T> {
 	 * Will throw a Luau error if the transform produces invalid or unsavable
 	 * data.
 	 *
-	 * Runs both Open and Update hooks, including fail hooks.
+	 * Runs both Open and Update hooks and signals, including fail hooks.
 	 *
 	 * @param transform - The transform function to run on the data.
 	 * @yields
 	 * @returns OpenResult<T>.
 	 */
 	public OpenAndUpdate(transform: Transform<T>): OpenResult<T>;
+
+	/**
+	 * Retrieves a signal that is fired when the document is opened. Note that
+	 * this will be fired on completion of any `:Open`, even if it failed.
+	 *
+	 * @yields
+	 * @returns Signal<OpenResult<T>>.
+	 */
+	public GetOpenedSignal(): Signal<OpenResult<T>>;
+
+	/**
+	 * Retrieves a signal that is fired when the document is closed. Note that
+	 * this will be fired on completion of any `:Close`, even if it failed.
+	 *
+	 * @yields
+	 * @returns Signal<WriteResult<T | undefined>>.
+	 */
+	public GetClosedSignal(): Signal<WriteResult<T | undefined>>;
+
+	/**
+	 * Retrieves a signal that is fired when the document is updated. For
+	 * example, this will be fired after an autosave or after you call
+	 * :`Save()`. Note that this will be fired on completion of any `:Update`,
+	 * even if it failed.
+	 *
+	 * @yields
+	 * @returns Signal<WriteResult<T>>.
+	 */
+	public GetUpdatedSignal(): Signal<WriteResult<T>>;
+
+	/**
+	 * Retrieves a signal that is fired when the document is read. Note that
+	 * this will be fired on completion of any `:Read`, even if it failed.
+	 *
+	 * @yields
+	 * @returns Signal<ReadResult<T>>.
+	 */
+	public GetReadSignal(): Signal<ReadResult<T>>;
+
+	/**
+	 * Retrieves a signal that is fired when the cache is set.
+	 *
+	 * @yields
+	 * @returns Signal<T>.
+	 */
+	public GetCacheChangedSignal(): Signal<T>;
 
 	/**
 	 * Reads the latest data stored in Data Stores.
@@ -257,10 +330,7 @@ export class Document<T> {
 	 * @returns Result<any, RobloxAPIError | SchemaError | CheckError |
 	 *   BackwardsCompatibilityError>.
 	 */
-	public Read(): Result<
-		T,
-		BackwardsCompatibilityError | CheckError | RobloxAPIError | SchemaError
-	>;
+	public Read(): ReadResult<T>;
 
 	/**
 	 * Saves a Document's cache to its DataStore. Equivalent to calling Update
@@ -269,7 +339,8 @@ export class Document<T> {
 	 * The document must be open and locked to use this method.
 	 *
 	 * @yields
-	 * @returns WriteResult<T>.
+	 * @returns WriteResult<T> - A WriteResult with the data field being the
+	 *   data saved to Data Stores.
 	 */
 	public Save(): WriteResult<T>;
 
@@ -278,6 +349,9 @@ export class Document<T> {
 	 *
 	 * The document must be open before using this method. You can only use
 	 * cache for session-locked data.
+	 *
+	 * Warning: Never yield between a GetCache and a SetCache while modifying
+	 * data or you may revert data.
 	 *
 	 * Warning: Your cache should always pass your check function, otherwise
 	 * autosaves may error.
@@ -307,7 +381,11 @@ export class Document<T> {
 	 *
 	 * The document must be open before using this method.
 	 *
-	 * If using session locking, transforms will build on cached data.
+	 * If using session locking, passing a transform is equivalent to calling
+	 * `SetCache` with the transformed data and then `Save`. If the Save fails,
+	 * the cache will still be updated.
+	 *
+	 * If you only need to update a document once, consider `OpenAndUpdate`.
 	 *
 	 * Throws if data is not storable or the transform return value is invalid.
 	 *

@@ -91,7 +91,7 @@ function SaveUtil.assertStorable(data: unknown, fieldName: string?)
 			end
 
 			if indexDataType and type(i) ~= indexDataType then
-				error(`Tables must only have on type of index to be storable. Field: {fieldName}`)
+				error(`Tables must only have one type of index to be storable. Field: {fieldName}`)
 			end
 
 			if type(i) == "number" and last then
@@ -180,7 +180,13 @@ function SaveUtil.updateAsync<T>(
 		assert(SaveUtil.getUpdateBudget() > 0, "Ran out of budget")
 
 		local resultData, resultKeyInfo = dataStore:UpdateAsync(key, function(data: any, keyInfo: DataStoreKeyInfo)
-			return transform(abortAttempt, data, keyInfo)
+			local transformResult = transform(abortAttempt, data, keyInfo)
+
+			if shouldAbort then
+				return data
+			else
+				return transformResult
+			end
 		end)
 
 		if shouldAbort then

@@ -395,42 +395,6 @@ Test("Session locking affects IsOpenAvailable correctly", function()
 	end
 end)
 
-Test("Session locking prevents other sessions from opening", function()
-	local mockDataStore = MockDataStoreService.new():GetDataStore("1")
-
-	local session1 = DocumentService.DocumentStore.new({
-		dataStore = mockDataStore,
-		check = Guard.Check(testDataCheck),
-		default = {
-			Document = "Document",
-			Service = 3,
-		},
-		migrations = {},
-		lockSessions = true,
-	})
-	local session2 = DocumentService.DocumentStore.new({
-		dataStore = mockDataStore,
-		check = Guard.Check(testDataCheck),
-		default = {
-			Document = "Document",
-			Service = 3,
-		},
-		migrations = {},
-		lockSessions = true,
-	})
-	do
-		local document = session1:GetDocument("1")
-		local result = document:Open()
-		assert(result.success == true)
-	end
-	do
-		local document = session2:GetDocument("1")
-		local result = document:Open()
-		assert(result.success == false)
-		assert(result.reason == "SessionLockedError")
-	end
-end)
-
 Test("Data mutations with :Update persist with no migrations", function()
 	local documentStore = createTestDocumentStore()
 	local document = documentStore:GetDocument("6")
@@ -874,7 +838,7 @@ Test("Migrating from a non-zero version does not run old migrations", function()
 				},
 				{
 					backwardsCompatible = true,
-					migrate = function(data)
+					migrate = function(data: any)
 						data.newField = "new field migrated"
 						migrationRunCount += 1
 
@@ -964,7 +928,9 @@ Test("Backwards incompatible schemas fail with BackwardsCompatibilityError", fun
 
 			return {
 				testString = CheckInterface.testString(Value.testString),
-				testNumber = CheckInterface.testNumber(Value.testNumber),
+				-- We deliberately use the wrong type to make sure
+				-- BackwardsCompatibilityError takes priority over CheckError.
+				testNumber = CheckInterface.testString(Value.testNumber),
 			}
 		end
 
@@ -973,7 +939,7 @@ Test("Backwards incompatible schemas fail with BackwardsCompatibilityError", fun
 			check = Guard.Check(check),
 			default = {
 				testString = "string",
-				testNumber = 0,
+				testNumber = "string",
 			},
 			migrations = {},
 			lockSessions = true,
@@ -1575,6 +1541,7 @@ Test("Opening a locked document returns SessionLockedError", function()
 		migrations = {},
 		lockSessions = true,
 	})
+
 	local session2 = DocumentService.DocumentStore.new({
 		dataStore = mockDataStore,
 		check = Guard.Check(testDataCheck),
@@ -2258,16 +2225,13 @@ Test("Read Hooks cleanup run correctly", function()
 	local secondCleanupRan = false
 	local failRan = false
 
-	local cleanupFirst = document:HookBefore("Read", function()
-
-	end)
+	local cleanupFirst = document:HookBefore("Read", function() end)
 	firstCleanupRan = pcall(cleanupFirst)
 
 	local cleanupSecond = document:HookAfter("Read", function()
 		assert(firstCleanupRan, "Before hook didn't run")
 	end)
 	secondCleanupRan = pcall(cleanupSecond)
-
 
 	local cleanup
 	cleanup = document:HookFail("Read", function()
@@ -2324,6 +2288,127 @@ Test("Read Hooks run correctly", function()
 	assert(failRan)
 
 	document:Close()
+end)
+
+-- Sleitnick Signal is well-established and tested, so we do not need
+-- to test Once functionality etc
+Test("Read signals fire correctly", function()
+	local documentStore, mockDataStore = createTestDocumentStore()
+	local document = documentStore:GetDocument("1")
+	local secondRan = false
+	local failRan = false
+
+	document:GetReadSignal():Connect(function(result)
+		if result.success then
+			secondRan = true
+		else
+			failRan = true
+		end
+	end)
+
+	-- Open the document first so we don't get SchemaError
+	local result = document:Open()
+	local resultRead = document:Read()
+	assert(resultRead.success, "Read failed")
+	assert(secondRan, "Success signal didn't run")
+	assert(result.success, "Open failed")
+
+	assert(not failRan)
+	mockDataStore.errors:addSimulatedErrors(5)
+	resultRead = document:Read()
+	assert(not resultRead.success, "Read succeeded")
+	assert(failRan)
+
+	document:Close()
+end)
+
+-- This test relies on the fact that `:Save` calls Update
+-- to avoid very repetitive unit tests
+Test("Update signals fire correctly", function()
+	local documentStore, mockDataStore = createTestDocumentStore()
+	local document = documentStore:GetDocument("1")
+	local secondRan = false
+	local failRan = false
+
+	document:GetUpdatedSignal():Connect(function(result)
+		if result.success then
+			secondRan = true
+		else
+			failRan = true
+		end
+	end)
+
+	-- Open the document first so we don't get SchemaError
+	local result = document:Open()
+	local saveResult = document:Save()
+	assert(saveResult.success, "Save failed")
+	assert(secondRan, "Success signal didn't run")
+	assert(result.success, "Open failed")
+
+	assert(not failRan)
+	mockDataStore.errors:addSimulatedErrors(5)
+	saveResult = document:Save()
+	assert(not saveResult.success, "Save succeeded")
+	assert(failRan)
+
+	document:Close()
+end)
+
+Test("Closed signals fire correctly", function()
+	local documentStore, mockDataStore = createTestDocumentStore()
+	local document = documentStore:GetDocument("1")
+	local secondRan = false
+	local failRan = false
+
+	document:GetClosedSignal():Connect(function(result)
+		if result.success then
+			secondRan = true
+		else
+			failRan = true
+		end
+	end)
+
+	-- Open the document first so we don't get SchemaError
+	local result = document:Open()
+	local closeResult = document:Close()
+	assert(closeResult.success, "Close failed")
+	assert(secondRan, "Success signal didn't run")
+	assert(result.success, "Open failed")
+
+	assert(not failRan)
+	document:Open()
+	mockDataStore.errors:addSimulatedErrors(5)
+	closeResult = document:Close()
+	assert(not closeResult.success, "Close succeeded")
+	assert(failRan)
+
+	document:Close()
+end)
+
+Test("Open signals fire correctly", function()
+	local documentStore, mockDataStore = createTestDocumentStore()
+	local document = documentStore:GetDocument("1")
+	local secondRan = false
+	local failRan = false
+
+	document:GetOpenedSignal():Connect(function(result)
+		if result.success then
+			secondRan = true
+		else
+			failRan = true
+		end
+	end)
+
+	local result = document:Open()
+	assert(secondRan, "Hook didn't run")
+	assert(result.success, "Open failed")
+	document:Close()
+
+	assert(not failRan)
+	mockDataStore.errors:addSimulatedErrors(5)
+	local openResult = document:Open()
+	assert(not openResult.success, "Open succeeded")
+	assert(failRan)
 end)
 
 Test("Read Hooks run even if cleaned up while executing hooks", function()
@@ -2556,7 +2641,7 @@ Test("Fail Update Hooks run correctly", function()
 	document:Close()
 end)
 
-Test("Read Hooks run correctly", function()
+Test("Read Once Hooks run correctly", function()
 	local documentStore, mockDataStore = createTestDocumentStore()
 	local document = documentStore:GetDocument("1")
 	local firstRan = false
@@ -2628,7 +2713,7 @@ Test("Documents are garbage collected if closed", function()
 end)
 
 Test("OpenAndUpdate fails with invalid transform", function()
-	local documentStore = createTestDocumentStore()
+	local documentStore = createTestDocumentStoreNotLocked()
 	local document = documentStore:GetDocument("1")
 
 	shouldFail(function()
@@ -2639,7 +2724,7 @@ Test("OpenAndUpdate fails with invalid transform", function()
 end)
 
 Test("OpenAndUpdate fails with unsavable data", function()
-	local documentStore = createTestDocumentStore()
+	local documentStore = createTestDocumentStoreNotLocked()
 	local document = documentStore:GetDocument("1")
 
 	shouldFail(function()
@@ -2650,7 +2735,7 @@ Test("OpenAndUpdate fails with unsavable data", function()
 end)
 
 Test("OpenAndUpdate mutates data correctly", function()
-	local documentStore = createTestDocumentStore()
+	local documentStore = createTestDocumentStoreNotLocked()
 	local document = documentStore:GetDocument("1")
 
 	document:OpenAndUpdate(function(data: TestData)
@@ -2669,6 +2754,86 @@ Test("OpenAndUpdate mutates data correctly", function()
 
 	assert(result2.data.Service == 10000)
 	assert(result2.data.Document == "hi!")
+end)
+
+Test("Update does not revert cache updates", function()
+	local documentStore, mockDataStore = createTestDocumentStore()
+	local document = documentStore:GetDocument("1")
+
+	document:Open()
+
+	mockDataStore.yield:startYield()
+
+	task.spawn(function()
+		document:Update(function(data: any)
+			print(data)
+			return table.clone(data) :: any
+		end)
+	end)
+
+	local newCache = table.clone(document:GetCache())
+	newCache.Document = "changed"
+	document:SetCache(newCache)
+
+	mockDataStore.yield:stopYield()
+
+	assert(document:GetCache() == newCache and document:GetCache().Document == "changed")
+end)
+
+Test("Migration errors result in Open erroring", function()
+	local mockDataStore = MockDataStoreService.new():GetDataStore("1")
+
+	local CheckInterface = {
+		testString = Guard.String,
+		testNumber = Guard.Number,
+	}
+
+	local function check(value: unknown)
+		assert(type(value) == "table")
+		local Value: any = value
+
+		return {
+			testString = CheckInterface.testString(Value.testString),
+			testNumber = CheckInterface.testNumber(Value.testNumber),
+		}
+	end
+
+	local store0 = DocumentService.DocumentStore.new({
+		dataStore = mockDataStore,
+		check = Guard.Check(check),
+		default = {
+			testString = "string",
+			testNumber = 0,
+		},
+		lockSessions = true,
+	})
+
+	local store1 = DocumentService.DocumentStore.new({
+		dataStore = mockDataStore,
+		check = Guard.Check(check),
+		default = {
+			testString = "string",
+			testNumber = 0,
+		},
+		migrations = {
+			{
+				backwardsCompatible = false,
+				migrate = function(data)
+					error("Oops")
+					return data
+				end,
+			},
+		},
+		lockSessions = true,
+	})
+
+	local document = store0:GetDocument("1")
+	document:Open()
+	document:Close()
+	document = store1:GetDocument("1")
+	shouldFail(function()
+		document:Open()
+	end)
 end)
 
 print(`Tests complete. {Results.passed} passed, {Results.failed} failed`)

@@ -13,6 +13,9 @@ import type { DataStoreInterface, Migrations } from "./Types";
  * @template T - The type of the data.
  */
 export class DocumentStore<T> {
+	/** @returns If a given metatable passed is a DocumentStore. */
+	public isDocumentStore: (instance: unknown) => boolean;
+
 	/**
 	 * Creates a new DocumentStore.
 	 *
@@ -25,14 +28,26 @@ export class DocumentStore<T> {
 	 *
 	 * @template T - The type of the data.
 	 * @param props - DocumentStoreProps to create the DocumentStore.
+	 * @param props.bindToClose - Should the DocumentStore close all documents
+	 *   on BindToClose? [default=true] (This should always be true in
+	 *   production).
+	 * @param props.check - A type check function for your data, errors if types
+	 *   are invalid.
+	 * @param props.dataStore - The object returned by
+	 *   DataStoreService:GetDataStore().
+	 * @param props.default - The default data to use if the key does not exist.
+	 * @param props.lockSessions - Should the DocumentStore lock sessions?
+	 *   [default=true].
+	 * @param props.migrations - Migrations to run on the data.
 	 * @returns DocumentStore<T>.
 	 */
 	constructor(props: {
+		bindToClose: boolean | undefined;
 		check: (data: unknown) => boolean | LuaTuple<[boolean, T?]>;
 		dataStore: DataStoreInterface;
 		default: T;
 		lockSessions: boolean;
-		migrations: Migrations;
+		migrations: Migrations | undefined;
 	});
 
 	/**
@@ -68,7 +83,4 @@ export class DocumentStore<T> {
 	 * @returns Boolean -- whether a new document was created.
 	 */
 	public GetDocument(key: string): LuaTuple<[document: Document<T>, created: boolean]>;
-
-	/** @returns If a given metatable passed is a DocumentStore. */
-	public isDocumentStore: (instance: unknown) => boolean;
 }
