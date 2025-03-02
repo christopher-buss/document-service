@@ -717,7 +717,7 @@ function Document.GetCacheChangedSignal<T>(self: Document<T>): Signal.Signal<T>
 end
 
 --[=[
-	Returns a false Result if Document is either:
+	Returns a false Result if Document is either:Returns a false Result if Document is either:
 	i. Currently open in this server
 	ii. Currently locked by another session
 	
